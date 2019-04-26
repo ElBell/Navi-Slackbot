@@ -12,10 +12,8 @@ class Bot(object):
         self.slack_client = SlackClient(os.environ["BOT_SLACK_API_TOKEN"])
         self.bot_name = "navi"
         self.bot_id = self.get_bot_id()
-
         if self.bot_id is None:
             exit("Error, could not find " + self.bot_name)
-
         self.event = event.Event(self)
         self.listen()
 

@@ -143,6 +143,7 @@ def generate_link_md(link: Link, users):
         f"Posted: {datetime.fromtimestamp(float(link.timestamp)).strftime('%b %d %Y %I:%M:%S%p')} <br/> "
 
 
+#
 def generate_md_file(sectioned_links, channel_id):
     users = get_users()
     md_file = [f"# {get_channel_name(channel_id)}"]
@@ -155,22 +156,13 @@ def generate_md_file(sectioned_links, channel_id):
     return ''.join(md_file)
 
 
+# gets the json_data for a channel's history.
 def original_json(sectioned_links):
-    json_data = {category: [link.to_json() for link in links]
-                 for category, links in sectioned_links.items()}
+    json_data = {category: [link.to_json() for link in links] for category, links in sectioned_links.items()}
     return json_data
 
 
-def get_link_to_links(channel_id):
-    gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
-    keys = json.loads(gist.profile().content(id=gist_list_id))
-    return f"https://gist.github.com/ElBell/{keys[channel_id][1]}"
-
-
-def get_link_to_all():
-    return f"https://gist.github.com/ElBell/{gist_find_all}"
-
-
+# Returns channel name from channel id
 def get_channel_name(channel_id):
     if channel_id[0] == "C":
         return slack_client.api_call("channels.info", channel=channel_id)["channel"]["name"]
@@ -178,6 +170,7 @@ def get_channel_name(channel_id):
         return slack_client.api_call("groups.info", channel=channel_id)["group"]["name"]
 
 
+# Makes link or attachment into Link objects
 def parse_link_or_attachment(message: str) -> List[Link]:
     if 'attachments' in message:
         return parse_attachments(message)
@@ -185,6 +178,7 @@ def parse_link_or_attachment(message: str) -> List[Link]:
         return parse_message(message)
 
 
+# the json of Link objects in read in and the new links are inserted in the proper location
 def add_link(message, channel_id):
     gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
     keys = json.loads(gist.profile().content(id=gist_list_id))[channel_id]
@@ -193,10 +187,13 @@ def add_link(message, channel_id):
     new_links: List[Link] = parse_link_or_attachment(message)
     sectioned_links = add_to_section(new_links, sectioned_links)
     json_data = {category: [link.to_json() for link in links] for category, links in sectioned_links.items()}
+    # updates the json
     gist.profile().edit(id=keys[0], content=json.dumps(json_data))
+    # updates the markdown
     gist.profile().edit(id=keys[1], content=generate_md_file(sectioned_links, channel_id))
 
 
+# Puts links into their proper section based on url contents
 def add_to_section(links, sectioned_links):
     for link in links:
         for key, title in sections.items():
@@ -205,6 +202,7 @@ def add_to_section(links, sectioned_links):
     return sectioned_links
 
 
+# Reads in and saves all links from a channel's history
 def get_history(channel_id):
     gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
     sectioned_links = get_links(get_messages(channel_id))
@@ -219,14 +217,30 @@ def get_history(channel_id):
     return md_file['Gist-Link']
 
 
+# Creates a markdown that has a list of all the channel collections Navi has
 def get_all_links():
     gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
     keys = json.loads(gist.profile().content(id=gist_list_id))
     gist.profile().edit(id=gist_find_all, content=generate_all(keys))
 
 
+# Creates generates the actual markdown for get_all_links
 def generate_all(keys):
     file = []
     for channel_id in sorted(keys.keys()):
         file.append(f"[{get_channel_name(channel_id)}](https://gist.github.com/ElBell/{keys[channel_id][1]})<br/>")
     return "# .All links<br/>\n" + ''.join(sorted(file))
+
+
+# Links to specific channel's gist
+def get_link_to_links(channel_id):
+    gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
+    keys = json.loads(gist.profile().content(id=gist_list_id))
+    return f"https://gist.github.com/ElBell/{keys[channel_id][1]}"
+
+
+# Links to all of Navi's gists by channel name
+def get_link_to_all():
+    return f"https://gist.github.com/ElBell/{gist_find_all}"
+
+
