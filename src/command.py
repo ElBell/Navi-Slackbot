@@ -27,7 +27,7 @@ class Command(object):
 
     def history(self):
         gist = get_history(self.channel)
-        return "I retrieved all the links from " + get_channel_name(self.channel) + ":\n" + gist
+        return "I found all the links from " + get_channel_name(self.channel) + ":\n" + gist
 
     def links(self):
         return get_link_to_links(self.channel)

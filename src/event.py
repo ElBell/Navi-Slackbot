@@ -22,7 +22,7 @@ class Event:
                 add_link(event, event['channel'])
 
     def handle_event(self, user, command, channel):
-        self.bot.slack_client.api_call("chat.postMessage", channel=channel, text='I\'m working on the command: ' + command, as_user=True,
+        self.bot.slack_client.api_call("chat.postMessage", channel=channel, text='I\'m on it!', as_user=True,
                                        unfurl_links=False, unfurl_media=False)
         if command and channel:
             print("Received command: " + command + " in channel: " + channel + " from user: " + user)
