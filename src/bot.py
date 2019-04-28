@@ -3,7 +3,7 @@ import time
 
 from websocket import WebSocketConnectionClosedException
 
-import event
+from event import Event
 from slackclient import SlackClient
 
 
@@ -14,7 +14,7 @@ class Bot(object):
         self.bot_id = self.get_bot_id()
         if self.bot_id is None:
             exit("Error, could not find " + self.bot_name)
-        self.event = event.Event(self)
+        self.event = Event(self)
         self.listen()
 
     def get_bot_id(self):

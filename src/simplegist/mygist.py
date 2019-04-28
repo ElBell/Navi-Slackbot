@@ -27,7 +27,7 @@ class Mygist:
 		limit = len(r.json())
 		if (r.status_code == 200 ):
 			for g,no in zip(r_text, range(0,limit)):
-				for key,value in r.json()[no]['files'].iteritems():
+				for key,value in r.json()[no]['files'].items():
 					file_name.append(value['filename'])
 			return file_name
 

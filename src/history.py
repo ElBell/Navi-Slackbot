@@ -1,6 +1,5 @@
 import os
 import re
-import threading
 import time
 import json
 from datetime import datetime
@@ -58,8 +57,14 @@ def get_users():
     return users
 
 
-# Reads in and saves all links from a channel's history
-def get_all_links(gist_id, channel_id):
+def get_all_links(channel_id):
+    """
+    Reads in and saves all links from a channel's history
+
+    :param gist_id:
+    :param channel_id:
+    :return:
+    """
     has_more = True
     latest = datetime.now().timestamp()
     call = "channels.history" if channel_id[0] == "C" else "groups.history"
@@ -68,8 +73,7 @@ def get_all_links(gist_id, channel_id):
         if not current['ok'] and current['error'] == 'ratelimited':
             time.sleep(int(current['headers']['Retry-After']))
         else:
-            threading.Thread(target=get_links, args=(gist_id, current['messages'][:100])).start()
-            threading.Thread(target=get_links, args=(gist_id, current['messages'][100:])).start()
+            yield get_links(current['messages'])
             has_more = current['has_more']
             latest = current['messages'][len(current['messages'])-1]['ts']
 
@@ -119,36 +123,34 @@ def link_or_attachment(raw_message):
 
 
 # Gets all links from raw_messages and writes out to the proper gist
-def get_links(gist_id, raw_messages):
+def get_links(raw_messages):
     links_set: Set[Link] = set()
     for message in [raw_message for raw_message in raw_messages if 'navi' not in str(raw_message).lower()]:
         links: List[Link] = parse_link_or_attachment(message)
         if links is not None:
             links_set.update(links)
-    generate_json(gist_id, sort_into_sections(links_set))
+    return sort_into_sections(links_set)
 
 
 # gets json_data for a group of links
-def merge_dicts(old_links, new_links):
+def merge_dicts(links):
     total_links = {}
-    for title in old_links.keys():
-        total_links[title] = old_links[title] + new_links[title]
+    for link in links:
+        for title in link:
+            if title not in total_links:
+                total_links[title] = []
+            total_links[title].extend(link[title])
     return total_links
 
 
-lock = threading.Lock()
-
-
 def generate_json(gist_id, new_links):
-    lock.acquire()
     gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
     json_data = json.loads(gist.profile().content(id=gist_id))
     old_links = {category: [Link.from_json(link) for link in links] for category, links in json_data.items()}
-    total_links = merge_dicts(old_links, new_links)
+    total_links = merge_dicts([old_links, sort_into_sections(new_links)])
     json_data = {category: [link.to_json() for link in links] for category, links in total_links.items()}
     # updates the json
     gist.profile().edit(id=gist_id, content=json.dumps(json_data))
-    lock.release()
     return total_links
 
 
@@ -180,8 +182,6 @@ def add_link(message, channel_id):
 
 # Puts links into their proper section based on url contents
 def add_to_section(links, sectioned_links):
-    print(links)
-    print(sectioned_links)
     for link in links:
         for key, title in sections.items():
             if key in link.url:
@@ -198,13 +198,13 @@ def empty_section_dict():
 
 def get_history(channel_id):
     gist = Simplegist(username='ElBell', api_token=os.environ["GIST_ACCESS_TOKEN"])
+    total_links = merge_dicts(get_all_links(channel_id))
+    json_data = {category: [link.to_json() for link in links] for category, links in total_links.items()}
+    # updates the json
     json_file = gist.create(name=get_channel_name(channel_id) + ".json", description="json for channel links",
-                            content=empty_section_dict())
-    get_all_links(json_file['id'], channel_id)
-    json_data = json.loads(gist.profile().content(id=json_file['id']))
-    sectioned_links = {category: [Link.from_json(link) for link in links] for category, links in json_data.items()}
+                            content=json.dumps(json_data))
     md_file = gist.create(name=get_channel_name(channel_id) + ".md", description="Collected links of channel",
-                          content=generate_md_file(sectioned_links, channel_id))
+                          content=generate_md_file(total_links, channel_id))
     keys = json.loads(gist.profile().content(id=gist_list_id))
     keys[channel_id] = [json_file['id'], md_file['id']]
     gist.profile().edit(id=gist_list_id, content=json.dumps(keys))
@@ -215,8 +215,13 @@ def get_history(channel_id):
 # Getting the possible title from the link using Beautiful Soup
 def generate_link_md(link: Link, users):
     try:
-        title = BeautifulSoup(requests.get(link.url).text, 'lxml').title.string
-        if any(word in title.lower() for word in ignored_titles):
+        response = requests.get(link.url)
+        if response.ok:
+            regex = re.compile('<title>(.*?)</title>', re.IGNORECASE | re.DOTALL)
+            title = regex.search(response.text).group(1)
+            if len(title) < 3:
+                title = link.url
+        else:
             title = link.url
     except:
         title = link.url
