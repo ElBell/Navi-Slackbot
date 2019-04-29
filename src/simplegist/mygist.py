@@ -2,6 +2,7 @@ import json
 import requests
 from simplegist.config import BASE_URL, GIST_URL
 
+
 class Mygist:
 	def __init__(self, gist, **args):
 		self.gist = gist

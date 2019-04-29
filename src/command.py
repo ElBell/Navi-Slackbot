@@ -8,6 +8,7 @@ class Command(object):
             "has joined the group": self.history,
             "has joined the channel": self.history,
             "find all": self.find_all,
+            "sis...": self.help,
             "links": self.links,
             "hey": self.hey
         }
@@ -34,6 +35,7 @@ class Command(object):
 
     def find_all(self):
         return get_link_to_all()
+
 
     def help(self):
         response = "Currently I support the following commands:\r\n"
